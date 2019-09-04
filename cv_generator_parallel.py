@@ -1,10 +1,10 @@
 import numpy as np
-import subprocess
+import subprocess, os, sys
 import multiprocessing as mp
 import edit_plumed as ep
 import matplotlib.pyplot as plt
 import pandas as pd
-
+os.system("taskset -p 0xfffff %d" % os.getpid())
 
 def calc_stats(fname,op_range,boundsA,boundsB):
     
@@ -17,6 +17,7 @@ def calc_stats(fname,op_range,boundsA,boundsB):
     ft_idx = [i for i in range(len(data.columns)) if ("feature" in data.columns[i]) ]
     mean = data.mean()[ft_idx]
     std = data.std()[ft_idx]
+        
     # plotd scatter matrix
     #pd.plotting.scatter_matrix(data,figsize=(12,12))
     #plt.savefig("scatter_%s.png" %  fname)
@@ -76,7 +77,7 @@ def calc_stats(fname,op_range,boundsA,boundsB):
         
     ax1.set_title("%s KLD=%5.2f NT=%d" % (fname,kld,nt) )
     
-    plt.savefig("op_%s.png" % fname)
+    plt.savefig("%s_op.png" % fname)
     plt.close()
     return kld,nt,mean,std
 
@@ -85,10 +86,10 @@ def calc_stats(fname,op_range,boundsA,boundsB):
 def run(idx_gen,idx_pop,weight,run_next):
     
     name = "%03d_%03d_M"% (idx_gen,idx_pop)
-    pfile = ep.do_metad([op_file,features_file],name,\
+    pfile = ep.do_metad([op_file,features_file],dirname,name,\
                         ww=weight,mean=mean.values,std=std.values,restart=False)
         
-    cmd = "%s -deffnm %s -plumed %s" % (mdrun_cmd,name,pfile)
+    cmd = "%s -deffnm %s/%s -plumed %s" % (mdrun_cmd,dirname,name,pfile)
     
     if(run_gmx):
         if(run_next<0):
@@ -97,15 +98,15 @@ def run(idx_gen,idx_pop,weight,run_next):
             #print("# DONE")
         else:
             oldname = "%03d_%03d_M"% (idx_gen-1,run_next)
-            cmd = "cp OUTPUT_%s OUTPUT_%s " % (oldname, name)
+            cmd = "cp %s/OUTPUT_%s %s/OUTPUT_%s " % (dirname,oldname, dirname,name)
             subprocess.check_output(cmd,shell=True)
         
     # run w static bias
     name = "%03d_%03d_S"% (idx_gen,idx_pop)
-    pfile = ep.do_metad([op_file,features_file],name,\
+    pfile = ep.do_metad([op_file,features_file],dirname,name,\
                         ww=weight,mean=mean.values,std=std.values,restart=True)
         
-    cmd = "%s -deffnm %s -plumed %s" % (mdrun_cmd,name,pfile)
+    cmd = "%s -deffnm %s/%s -plumed %s" % (mdrun_cmd,dirname,name,pfile)
     
     if(run_gmx):
         if(run_next<0):
@@ -114,10 +115,11 @@ def run(idx_gen,idx_pop,weight,run_next):
             #print("# DONE")
         else:
             oldname = "%03d_%03d_S"% (idx_gen-1,run_next)
-            cmd = "cp OUTPUT_%s OUTPUT_%s " % (oldname, name)
+            cmd = "cp %s/OUTPUT_%s %s/OUTPUT_%s " % (dirname,oldname, dirname,name)
+
             subprocess.check_output(cmd,shell=True)
                 
-    kld_s,nt_s,mean_s,std_s  = calc_stats("OUTPUT_%s" % name,op_range,bounds_A,bounds_B)
+    kld_s,nt_s,mean_s,std_s  = calc_stats("%s/OUTPUT_%s" % (dirname,name),op_range,bounds_A,bounds_B)
     return (kld_s,nt_s)
 
 
@@ -126,7 +128,9 @@ if __name__ == '__main__':
     np.random.seed(123)
     #run_gmx = False
     run_gmx = True
-    generations = 100
+    dirname = sys.argv[1]
+    os.system("mkdir -p %s" % dirname)
+    generations = 10
     pop_size = 10
     elite_size = 2
     child_size = 5
@@ -149,17 +153,17 @@ if __name__ == '__main__':
     #### OK, now we start. ###############
 
     # if it is not possible to bias OP run plain MD
-    nsteps = 500000 
+    nsteps = 50000
     mdrun_cmd = "gmx_mpi mdrun -s topol.tpr -nsteps %d" % (nsteps)
     all_weights = []
-    pfile = ep.do_colvar([op_file,features_file],"reference")
+    pfile = ep.do_colvar([op_file,features_file],dirname,"reference")
 
-    cmd = "%s -deffnm %s -plumed %s" % (mdrun_cmd,"reference",pfile)
+    cmd = "%s -deffnm %s/%s -plumed %s" % (mdrun_cmd,dirname,"reference",pfile)
     print("# RUNNING ", cmd)
     if(run_gmx):
         out = subprocess.check_output(cmd,shell=True,stderr=subprocess.STDOUT)
     print("# DONE")
-    kld,nt,mean,std  = calc_stats("OUTPUT_%s" % "reference",op_range,bounds_A,bounds_B)
+    kld,nt,mean,std  = calc_stats("%s/OUTPUT_%s" % (dirname,"reference"),op_range,bounds_A,bounds_B)
 
     nf = mean.shape[0]
     

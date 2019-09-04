@@ -29,7 +29,7 @@ def calc_obs(fname):
 
 
 
-def do_colvar(files,suffix,stride=100):
+def do_colvar(files,dirname,suffix,stride=100):
 
     stri = ""
     labs = ""
@@ -38,8 +38,8 @@ def do_colvar(files,suffix,stride=100):
         stri += ss
         labs = "%s,%s" % (labs,",".join(ll))
 
-    stri += "PRINT FILE=OUTPUT_%s STRIDE=%d ARG=%s" % (suffix,stride,labs)
-    fname = "plumed_%s.dat" % suffix
+    stri += "PRINT FILE=%s/OUTPUT_%s STRIDE=%d ARG=%s" % (dirname,suffix,stride,labs)
+    fname = "%s/plumed_%s.dat" % (dirname,suffix)
     fhw = open(fname,"w")
     fhw.write(stri)
     fhw.close()
@@ -70,7 +70,7 @@ def create_cv(fname,ww,mean,sigma):
     stri += "... COMBINE"
 
 
-def do_metad(files,suffix,ww,mean,std,restart,stride=100):
+def do_metad(files,dirname,suffix,ww,mean,std,restart,stride=100):
 
     stri = ""
     if(restart):
@@ -96,13 +96,13 @@ def do_metad(files,suffix,ww,mean,std,restart,stride=100):
     
     labs+= ",CV"
     
-    stri += "PRINT FILE=OUTPUT_%s STRIDE=%d ARG=%s RESTART=NO\n" % (suffix,stride,labs[1:])
+    stri += "PRINT FILE=%s/OUTPUT_%s STRIDE=%d ARG=%s RESTART=NO\n" % (dirname,suffix,stride,labs[1:])
     if(restart):
-        stri += "METAD ARG=CV PACE=500000000 HEIGHT=0.0 SIGMA=0.1 FILE=bias_%s\n" % (suffix.replace("S","M"))
+        stri += "METAD ARG=CV PACE=500000000 HEIGHT=0.0 SIGMA=0.1 FILE=%s/bias_%s\n" % (dirname,suffix.replace("S","M"))
     else:
-        stri += "METAD ARG=CV PACE=100 HEIGHT=0.5 SIGMA=0.1 FILE=bias_%s\n" % (suffix)
+        stri += "METAD ARG=CV PACE=100 HEIGHT=0.5 SIGMA=0.1 FILE=%s/bias_%s\n" % (dirname,suffix)
 
-    fname = "plumed_%s.dat" % suffix
+    fname = "%s/plumed_%s.dat" % (dirname,suffix)
     fhw = open(fname,"w")
     fhw.write(stri)
     fhw.close()
